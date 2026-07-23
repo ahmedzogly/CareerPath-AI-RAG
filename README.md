@@ -1,4 +1,6 @@
-# CareerPath AI — RAG Career & CV Assistant
+# Digilians Career Path AI — RAG Career & CV Assistant
+
+Made By Ahmed Zoghli For Digilians.
 
 A Python/Streamlit Retrieval-Augmented Generation project that answers career, CV, and cover-letter questions using a local document corpus and source citations.
 
