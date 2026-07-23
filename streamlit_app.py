@@ -51,6 +51,11 @@ with st.sidebar:
         with st.spinner("Building embeddings…"):
             try: st.success(f"{create_chroma_store()} chunks are ready.")
             except Exception as exc: st.error(str(exc))
+    if st.button("🧹 مسح المخرجات" if interface_language == "العربية" else "🧹 Clear output", use_container_width=True, help="Clear chat answers and the generated CV from this session."):
+        st.session_state.chat_history = []
+        st.session_state.pending_question = None
+        st.session_state.generated_cv = None
+        st.rerun()
     st.divider()
     st.caption("🔒 لا تكتب بيانات شخصية حساسة. الإرشاد معلوماتي ولا يضمن الحصول على وظيفة." if interface_language == "العربية" else "🔒 Do not enter sensitive personal data. Guidance is informational and does not guarantee employment.")
 
