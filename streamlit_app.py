@@ -10,7 +10,7 @@ retrieve_context = import_module("06_retrieve_context").retrieve_context
 rag = import_module("07_prompting")
 resume_tools = import_module("08_resume_builder")
 
-st.set_page_config(page_title="Digilians Career Path AI", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Digilians Career Path AI", page_icon="assets/digilians_logo.png", layout="wide")
 
 try:
     rag.OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", os.getenv("OPENROUTER_API_KEY", ""))
@@ -40,7 +40,9 @@ if "resume_links" not in st.session_state: st.session_state.resume_links = [{}]
 if "generated_cv" not in st.session_state: st.session_state.generated_cv = None
 
 with st.sidebar:
-    st.title("🎯 Digilians Career Path AI")
+    st.image("assets/digilians_logo.png", width=72)
+    st.title("Digilians Career Path AI")
+    st.caption("Made By Ahmed Zoghli For Digilians")
     interface_language = st.radio("Language / اللغة", ["العربية", "English"], horizontal=True)
     st.divider()
     st.subheader("اختر المسار الوظيفي" if interface_language == "العربية" else "Choose a career path")
@@ -59,9 +61,13 @@ if not store_is_current():
 
 role = ROLES[st.session_state.selected_role]
 page_title = "مساعدك المهني الذكي" if interface_language == "العربية" else "Your smart career assistant"
-st.title(f"{role['icon']} Digilians Career Path AI")
-st.caption("Made By Ahmed Zoghli For Digilians")
-st.caption("مساعد مهني يعتمد على مصادر مسترجعة مع citations واضحة." if interface_language == "العربية" else "A source-grounded career assistant with clear citations.")
+logo_col, title_col = st.columns([1, 8], vertical_alignment="center")
+with logo_col:
+    st.image("assets/digilians_logo.png", width=76)
+with title_col:
+    st.title("Digilians Career Path AI")
+    st.caption("Made By Ahmed Zoghli For Digilians")
+    st.caption("مساعد مهني يعتمد على مصادر مسترجعة مع citations واضحة." if interface_language == "العربية" else "A source-grounded career assistant with clear citations.")
 
 # Compact dynamic role card
 st.markdown(f"### {role['icon']} {role['ar']} — {st.session_state.selected_role}")
