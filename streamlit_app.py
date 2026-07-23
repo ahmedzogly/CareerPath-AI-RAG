@@ -1,4 +1,6 @@
 import os
+import json
+import re
 from importlib import import_module
 import streamlit as st
 
@@ -6,6 +8,7 @@ create_module = import_module("05_create_chroma_store")
 create_chroma_store, store_is_current = create_module.create_chroma_store, create_module.store_is_current
 retrieve_context = import_module("06_retrieve_context").retrieve_context
 rag = import_module("07_prompting")
+resume_tools = import_module("08_resume_builder")
 
 st.set_page_config(page_title="CareerPath AI", page_icon="🎯", layout="wide")
 
@@ -30,6 +33,11 @@ SOURCE_LABELS = {"01_harvard_resume_and_cover_letter.md": "Harvard — Resume & 
 if "selected_role" not in st.session_state: st.session_state.selected_role = "AI & Data Analyst"
 if "chat_history" not in st.session_state: st.session_state.chat_history = []
 if "pending_question" not in st.session_state: st.session_state.pending_question = None
+if "resume_experience" not in st.session_state: st.session_state.resume_experience = [{}]
+if "resume_education" not in st.session_state: st.session_state.resume_education = [{}]
+if "resume_projects" not in st.session_state: st.session_state.resume_projects = [{}]
+if "resume_links" not in st.session_state: st.session_state.resume_links = [{}]
+if "generated_cv" not in st.session_state: st.session_state.generated_cv = None
 
 with st.sidebar:
     st.title("🎯 CareerPath AI")
@@ -102,16 +110,94 @@ with tab_explore:
                 st.rerun()
 
 with tab_cv:
-    st.subheader("CV & Cover Letter Assistant")
-    st.caption("اكتب معلومات عامة فقط ولا تضف أرقام هوية أو عناوين أو بيانات حساسة." if interface_language == "العربية" else "Use general information only; do not add IDs, addresses, or sensitive personal data.")
-    level = st.selectbox("المستوى" if interface_language == "العربية" else "Level", ["Beginner", "Intermediate", "Experienced"])
-    skills = st.text_area("مهاراتك الحالية" if interface_language == "العربية" else "Your current skills", placeholder="SQL, Excel, Python, Power BI…")
-    experience = st.text_area("التعليم أو الخبرة ذات الصلة" if interface_language == "العربية" else "Relevant education or experience", placeholder="University projects, internship, volunteer work…")
-    c1, c2 = st.columns(2)
-    if c1.button("إنشاء Professional Summary" if interface_language == "العربية" else "Create Professional Summary", use_container_width=True):
-        st.session_state.pending_question = f"Write a concise professional summary for a {level} {st.session_state.selected_role} candidate. Current skills: {skills}. Relevant education or experience: {experience}. Keep it truthful and use only the supplied details."
-        st.session_state.active_tab = "chat"
-        st.info("انتقل إلى تبويب اسأل المساعد لرؤية النتيجة." if interface_language == "العربية" else "Go to Ask assistant to see the result.")
-    if c2.button("إنشاء Cover Letter" if interface_language == "العربية" else "Create Cover Letter", use_container_width=True):
-        st.session_state.pending_question = f"Draft a concise cover letter for a {level} {st.session_state.selected_role} role. Skills: {skills}. Relevant education or experience: {experience}. Use placeholders for company and hiring manager. Keep it truthful."
-        st.info("انتقل إلى تبويب اسأل المساعد لرؤية النتيجة." if interface_language == "العربية" else "Go to Ask assistant to see the result.")
+    st.subheader("CV Builder Pro — منشئ سيرة ذاتية احترافية")
+    st.caption("املأ معلوماتك الحقيقية فقط. سيعيد المساعد تنظيمها وتخصيصها للمسار المختار دون اختلاق خبرات أو إنجازات.")
+    cv_personal, cv_exp, cv_edu, cv_skills, cv_projects, cv_links, cv_theme = st.tabs(["👤 Personal", "💼 Experience", "🎓 Education", "✨ Skills", "📁 Projects", "🔗 Links", "🎨 Theme"])
+    with cv_personal:
+        a, b = st.columns(2)
+        with a:
+            st.text_input("Full name / الاسم الكامل", key="cv_name")
+            st.text_input("Email", key="cv_email")
+            st.text_input("Location / الموقع", key="cv_location", placeholder="Al Mansurah, Egypt")
+        with b:
+            st.text_input("Target title / المسمى المستهدف", value=st.session_state.selected_role, key="cv_title")
+            st.text_input("Phone / الهاتف", key="cv_phone")
+            st.text_input("Website / Portfolio", key="cv_website")
+        st.text_area("About you / نبذة أولية", key="cv_about", height=120, placeholder="اكتب ملخصًا حقيقيًا عن دراستك، اهتماماتك، وخبراتك أو تدريباتك…")
+    with cv_exp:
+        st.caption("أضف الخبرات الحقيقية. استخدم الوصف لذكر مسؤولياتك أو إنجازاتك، وسيتولى المساعد تحسين الصياغة.")
+        for i, _ in enumerate(st.session_state.resume_experience):
+            with st.expander(f"Experience {i+1}", expanded=True):
+                x, y = st.columns(2)
+                x.text_input("Role", key=f"exp_role_{i}"); y.text_input("Company", key=f"exp_company_{i}")
+                x, y = st.columns(2)
+                x.text_input("Start", key=f"exp_start_{i}", placeholder="2024"); y.text_input("End", key=f"exp_end_{i}", placeholder="Present or 2025")
+                st.text_area("Description / achievements", key=f"exp_desc_{i}", height=90)
+        if st.button("＋ Add experience", key="add_exp"): st.session_state.resume_experience.append({}); st.rerun()
+    with cv_edu:
+        for i, _ in enumerate(st.session_state.resume_education):
+            with st.expander(f"Education {i+1}", expanded=True):
+                st.text_input("School / University", key=f"edu_school_{i}")
+                x, y = st.columns(2); x.text_input("Degree", key=f"edu_degree_{i}"); y.text_input("Field of study", key=f"edu_field_{i}")
+                x, y = st.columns(2); x.text_input("Start", key=f"edu_start_{i}"); y.text_input("End", key=f"edu_end_{i}")
+        if st.button("＋ Add education", key="add_edu"): st.session_state.resume_education.append({}); st.rerun()
+    with cv_skills:
+        st.text_area("Skills (comma separated) / المهارات", key="cv_skills", height=150, placeholder="Python, SQL, Excel, Power BI, Communication…")
+        st.caption("ضع المهارات التي تمتلكها فعلًا فقط. سيقوم المساعد بترتيب الأكثر ارتباطًا بالوظيفة المستهدفة.")
+    with cv_projects:
+        for i, _ in enumerate(st.session_state.resume_projects):
+            with st.expander(f"Project {i+1}", expanded=True):
+                x, y = st.columns(2); x.text_input("Project name", key=f"project_name_{i}"); y.text_input("Project link (optional)", key=f"project_link_{i}")
+                st.text_area("Description", key=f"project_desc_{i}", height=80)
+        if st.button("＋ Add project", key="add_project"): st.session_state.resume_projects.append({}); st.rerun()
+    with cv_links:
+        for i, _ in enumerate(st.session_state.resume_links):
+            x, y = st.columns(2); x.text_input("Platform", key=f"link_label_{i}", placeholder="LinkedIn"); y.text_input("URL", key=f"link_url_{i}")
+        if st.button("＋ Add link", key="add_link"): st.session_state.resume_links.append({}); st.rerun()
+    with cv_theme:
+        cv_language = st.radio("CV language / لغة السيرة", ["English", "Arabic"], horizontal=True)
+        accent = st.selectbox("Accent color", ["#4f46e5", "#0f766e", "#be185d", "#b45309"], format_func=lambda x: {"#4f46e5":"Indigo", "#0f766e":"Teal", "#be185d":"Rose", "#b45309":"Amber"}[x])
+        st.caption("تنسيق ATS بسيط وواضح. يوصى بالإنجليزية لملف PDF إذا كانت الجهة المستهدفة تستخدم الإنجليزية.")
+
+    def nonempty(value): return str(value or "").strip()
+    def profile_data():
+        experiences=[]
+        for i in range(len(st.session_state.resume_experience)):
+            item={"role":nonempty(st.session_state.get(f"exp_role_{i}")), "company":nonempty(st.session_state.get(f"exp_company_{i}")), "start":nonempty(st.session_state.get(f"exp_start_{i}")), "end":nonempty(st.session_state.get(f"exp_end_{i}")), "description":nonempty(st.session_state.get(f"exp_desc_{i}"))}
+            if any(item.values()): experiences.append(item)
+        education=[]
+        for i in range(len(st.session_state.resume_education)):
+            item={"school":nonempty(st.session_state.get(f"edu_school_{i}")), "degree":nonempty(st.session_state.get(f"edu_degree_{i}")), "field":nonempty(st.session_state.get(f"edu_field_{i}")), "start":nonempty(st.session_state.get(f"edu_start_{i}")), "end":nonempty(st.session_state.get(f"edu_end_{i}"))}
+            if any(item.values()): education.append(item)
+        projects=[]
+        for i in range(len(st.session_state.resume_projects)):
+            item={"name":nonempty(st.session_state.get(f"project_name_{i}")), "link":nonempty(st.session_state.get(f"project_link_{i}")), "description":nonempty(st.session_state.get(f"project_desc_{i}"))}
+            if any(item.values()): projects.append(item)
+        links=[]
+        for i in range(len(st.session_state.resume_links)):
+            item={"platform":nonempty(st.session_state.get(f"link_label_{i}")), "url":nonempty(st.session_state.get(f"link_url_{i}"))}
+            if any(item.values()): links.append(item)
+        return {"name":nonempty(st.session_state.get("cv_name")), "target_title":nonempty(st.session_state.get("cv_title")), "email":nonempty(st.session_state.get("cv_email")), "phone":nonempty(st.session_state.get("cv_phone")), "location":nonempty(st.session_state.get("cv_location")), "website":nonempty(st.session_state.get("cv_website")), "about":nonempty(st.session_state.get("cv_about")), "skills":nonempty(st.session_state.get("cv_skills")), "experience":experiences, "education":education, "projects":projects, "links":links}
+
+    st.divider()
+    if st.button("✨ Generate / Regenerate Professional CV", type="primary", use_container_width=True):
+        profile = profile_data()
+        if not profile["name"]:
+            st.warning("أدخل الاسم الكامل أولًا / Please enter your full name first.")
+        else:
+            try:
+                with st.spinner("Generating an ATS-friendly CV using the selected career context…"):
+                    resume_sources = retrieve_context(f"CV skills and responsibilities for {st.session_state.selected_role}", career_path=st.session_state.selected_role)
+                    st.session_state.generated_cv = resume_tools.generate_resume(rag, profile, st.session_state.selected_role, resume_sources, cv_language)
+                    st.session_state.generated_cv_accent = accent
+                st.success("Your professional CV is ready. Review the live preview and download it below.")
+            except Exception as exc: st.error(str(exc))
+    if st.session_state.generated_cv:
+        st.markdown("### Live CV Preview")
+        st.html(resume_tools.resume_html(st.session_state.generated_cv, st.session_state.get("generated_cv_accent", "#4f46e5")))
+        p1, p2, p3 = st.columns(3)
+        safe_name = re.sub(r"[^A-Za-z0-9_-]+", "_", st.session_state.generated_cv.get("name", "CV"))
+        p1.download_button("⬇ Download PDF", resume_tools.export_pdf(st.session_state.generated_cv), f"{safe_name}_CV.pdf", "application/pdf", use_container_width=True)
+        p2.download_button("⬇ Download DOCX", resume_tools.export_docx(st.session_state.generated_cv), f"{safe_name}_CV.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+        p3.download_button("⬇ Download CV JSON", json.dumps(st.session_state.generated_cv, ensure_ascii=False, indent=2), f"{safe_name}_CV.json", "application/json", use_container_width=True)
+
